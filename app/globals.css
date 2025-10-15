@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans text-gray-900 bg-gray-50;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-6 py-3 rounded-md font-semibold text-sm uppercase tracking-wide transition-all duration-300 cursor-pointer;
+  }
+  
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-4 focus:ring-blue-200;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-600 text-white hover:bg-gray-700 focus:ring-4 focus:ring-gray-200;
+  }
+  
+  .btn-warning {
+    @apply bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-4 focus:ring-yellow-200;
+  }
+  
+  .form-input {
+    @apply w-full px-3 py-2 border-2 border-gray-300 rounded-md text-sm transition-colors duration-300 focus:outline-none focus:border-blue-500;
+  }
+  
+  .form-select {
+    @apply w-full px-3 py-2 border-2 border-gray-300 rounded-md text-sm transition-colors duration-300 focus:outline-none focus:border-blue-500 bg-white;
+  }
+  
+  .form-group {
+    @apply mb-5;
+  }
+  
+  .form-label {
+    @apply block mb-2 font-semibold text-gray-700;
+  }
+  
+  .info-box {
+    @apply bg-blue-50 border-l-4 border-blue-500 p-4 my-5;
+  }
+  
+  .result-box {
+    @apply bg-green-50 border-2 border-green-500 rounded-md p-5 mt-5;
+  }
+  
+  .warning-text {
+    @apply text-red-600 font-bold text-base;
+  }
+  
+  .highlight {
+    @apply bg-yellow-100 px-2 py-1 rounded font-mono break-all;
+  }
+  
+  .loading-spinner {
+    @apply border-8 border-gray-200 border-t-blue-600 rounded-full w-16 h-16 animate-spin;
+  }
+}
