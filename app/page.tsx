@@ -138,6 +138,23 @@ export default function HomePage() {
     e.preventDefault();
     if (!account) return;
 
+    // ✅ CRITICAL: Double-check with user before reveal
+    const moveName =
+      MOVE_OPTIONS.find((m) => m.value === revealForm.move)?.label || "Unknown";
+    const confirmed = window.confirm(
+      `🚨 CRITICAL CHECK:\n\n` +
+        `Move: ${moveName}\n` +
+        `Salt: ${revealForm.salt.slice(0, 20)}...\n\n` +
+        `Are these values EXACTLY what you used when creating the game?\n\n` +
+        `⚠️ IF WRONG, YOU WILL LOSE YOUR STAKE!\n\n` +
+        `Click OK only if you are 100% sure.`
+    );
+
+    if (!confirmed) {
+      clearMessages();
+      return;
+    }
+
     try {
       await revealMove(
         revealForm.contractAddress,
@@ -484,52 +501,76 @@ export default function HomePage() {
               </form>
 
               {gameCreated && (
-                <div className="mt-6 bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <span className="text-2xl">🎉</span>
-                    <h3 className="text-lg font-bold text-green-900">
-                      Game Created!
-                    </h3>
+                <div className="mt-6 space-y-4">
+                  {/* CRITICAL WARNING BANNER */}
+                  <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-3xl">🚨</span>
+                      <h3 className="text-xl font-bold text-red-900">
+                        CRITICAL: SAVE YOUR SALT NOW!
+                      </h3>
+                    </div>
+                    <div className="space-y-2 text-red-800 text-sm">
+                      <p className="font-bold text-base">
+                        If you lose this salt, you will LOSE YOUR STAKED ETH!
+                      </p>
+                      <ul className="list-disc list-inside space-y-1 ml-2">
+                        <li>Copy the salt below to a password manager</li>
+                        <li>Write it down on paper as backup</li>
+                        <li>Do NOT rely only on this browser</li>
+                        <li>Clearing browser data will DELETE the salt</li>
+                      </ul>
+                      <p className="font-bold mt-2 text-red-900">
+                        ⚠️ There is NO WAY to recover a lost salt!
+                      </p>
+                    </div>
                   </div>
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm font-medium text-green-800 mb-1">
-                        Contract Address:
-                      </p>
-                      <p className="text-sm text-green-700 font-mono bg-green-100 px-2 py-1 rounded">
-                        {gameCreated.contractAddress}
-                      </p>
+
+                  {/* Game Info */}
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-2xl">🎉</span>
+                      <h3 className="text-lg font-bold text-green-900">
+                        Game Created Successfully!
+                      </h3>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-green-800 mb-1">
-                        Your Salt:
-                      </p>
-                      <p className="text-sm text-green-700 font-mono bg-green-100 px-2 py-1 rounded break-all">
-                        {gameCreated.salt}
-                      </p>
-                    </div>
-                    <div className="bg-amber-50 border border-amber-200 rounded p-3">
-                      <p className="text-amber-800 text-sm font-medium">
-                        ⚠️ SAVE THIS SALT! You'll need it to reveal your move.
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="secondary"
-                        onClick={() => copyToClipboard(gameCreated.salt)}
-                        className="flex-1"
-                      >
-                        Copy Salt
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() =>
-                          copyToClipboard(gameCreated.contractAddress)
-                        }
-                        className="flex-1"
-                      >
-                        Copy Address
-                      </Button>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-sm font-medium text-green-800 mb-1">
+                          Contract Address:
+                        </p>
+                        <p className="text-sm text-green-700 font-mono bg-green-100 px-2 py-1 rounded">
+                          {gameCreated.contractAddress}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-green-800 mb-1 flex items-center gap-2">
+                          Your Salt:
+                          <span className="text-red-600 font-bold">
+                            ← SAVE THIS!
+                          </span>
+                        </p>
+                        <p className="text-sm text-green-700 font-mono bg-green-100 px-2 py-1 rounded break-all">
+                          {gameCreated.salt}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => copyToClipboard(gameCreated.salt)}
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold"
+                        >
+                          📋 Copy Salt (DO THIS NOW!)
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            copyToClipboard(gameCreated.contractAddress)
+                          }
+                          className="flex-1"
+                        >
+                          Copy Address
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>

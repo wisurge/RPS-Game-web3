@@ -243,20 +243,31 @@ export const useGame = () => {
     const array = new Uint8Array(32);
     window.crypto.getRandomValues(array);
     
-    // Convert to hex string and then to BigInt
+    // Keep as hex string for better precision and readability
     let hexString = '0x';
     for (let i = 0; i < array.length; i++) {
       hexString += array[i].toString(16).padStart(2, '0');
     }
     
-    return BigInt(hexString).toString();
+    return hexString;  // ✅ Keep as hex string
   }, []);
 
   // Create commitment hash - matches contract's hash function
   const createCommitment = useCallback((move: number, salt: string) => {
     // Hash = keccak256(abi.encodePacked(move, salt)) - same as contract
-    const encoded = ethers.solidityPacked(['uint8', 'uint256'], [move, salt]);
+    // Convert salt to BigInt (works with both hex 0x... and decimal strings)
+    const saltBigInt = BigInt(salt);
+    const encoded = ethers.solidityPacked(['uint8', 'uint256'], [move, saltBigInt]);
     return ethers.keccak256(encoded);
+  }, []);
+
+  // Validate network before transactions
+  const validateNetwork = useCallback(async () => {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== 11155111) {
+      throw new Error(`Wrong network! Please switch to Sepolia testnet. Current: ${network.name}`);
+    }
   }, []);
 
   // Create a new game (Player 1)
@@ -274,6 +285,9 @@ export const useGame = () => {
     setError(null);
 
     try {
+      // Validate network first
+      await validateNetwork();
+
       // Validate inputs
       if (!move || move < 1 || move > 5) {
         throw new Error('Please select a valid move (1-5)');
@@ -287,6 +301,32 @@ export const useGame = () => {
         throw new Error('You cannot play against yourself');
       }
 
+      // Convert stake to Wei
+      const stakeWei = ethers.parseEther(stakeAmount);
+      
+      if (stakeWei <= 0n) {
+        throw new Error('Stake amount must be greater than 0');
+      }
+
+      // Get provider and signer
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      // ✅ Check balance before transaction
+      const balance = await provider.getBalance(account);
+      const feeData = await provider.getFeeData();
+      const gasPrice = feeData.gasPrice || 0n;
+      const estimatedGas = 500000n; // Rough estimate for contract deployment
+      const totalCost = stakeWei + (gasPrice * estimatedGas);
+      
+      if (balance < totalCost) {
+        throw new Error(
+          `Insufficient ETH. Need ${ethers.formatEther(totalCost)} ETH ` +
+          `(${ethers.formatEther(stakeWei)} stake + ~${ethers.formatEther(gasPrice * estimatedGas)} gas), ` +
+          `but you have ${ethers.formatEther(balance)} ETH`
+        );
+      }
+
       // Generate salt securely
       const salt = generateSalt();
       console.log('Generated salt:', salt);
@@ -295,13 +335,6 @@ export const useGame = () => {
       const commitment = createCommitment(move, salt);
       console.log('Commitment hash:', commitment);
       
-      // Convert stake to Wei
-      const stakeWei = ethers.parseEther(stakeAmount);
-      
-      // Get provider and signer
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      
       // Deploy new RPS contract
       const RPSFactory = new ethers.ContractFactory(RPS_ABI, RPS_BYTECODE, signer);
       
@@ -309,6 +342,9 @@ export const useGame = () => {
       const contract = await RPSFactory.deploy(commitment, opponentAddress, {
         value: stakeWei
       });
+      
+      const deployTx = contract.deploymentTransaction();
+      console.log('Deployment transaction:', deployTx?.hash);
       
       await contract.waitForDeployment();
       const contractAddress = await contract.getAddress();
@@ -325,17 +361,22 @@ export const useGame = () => {
       localStorage.setItem(`game_${contractAddress}`, JSON.stringify(gameData));
       
       setLoading(false);
-      setSuccess('Game created successfully!');
+      setSuccess(`Game created! Contract: ${contractAddress.slice(0, 10)}...`);
       
       return { contractAddress, salt };
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating game:', error);
       setLoading(false);
-      setError(`Failed to create game: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const txHash = error.transaction?.hash || error.receipt?.hash;
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const fullError = txHash 
+        ? `${errorMsg}. Tx: https://sepolia.etherscan.io/tx/${txHash}`
+        : errorMsg;
+      setError(`Failed to create game: ${fullError}`);
       throw error;
     }
-  }, [generateSalt, createCommitment, setLoading, setError, setSuccess]);
+  }, [generateSalt, createCommitment, validateNetwork, setLoading, setError, setSuccess]);
 
   // Load game information
   const loadGameInfo = useCallback(async (contractAddress: string, account: string) => {
@@ -347,6 +388,8 @@ export const useGame = () => {
     setError(null);
 
     try {
+      await validateNetwork();
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const contract = new ethers.Contract(contractAddress, RPS_ABI, provider);
       
@@ -358,10 +401,8 @@ export const useGame = () => {
         contract.c2()
       ]);
       
-      // Check if player 2 has already played
-      if (c2 > 0) {
-        throw new Error('Player 2 has already played in this game');
-      }
+      // ✅ Just inform - don't throw. Let contract validate on join.
+      const player2HasPlayed = Number(c2) > 0;
       
       // Verify current account is player 2
       if (j2.toLowerCase() !== account.toLowerCase()) {
@@ -373,7 +414,8 @@ export const useGame = () => {
       return {
         stake: ethers.formatEther(stake),
         player1: j1,
-        player2: j2
+        player2: j2,
+        player2HasPlayed  // ✅ Just informational
       };
       
     } catch (error) {
@@ -382,7 +424,7 @@ export const useGame = () => {
       setError(`Failed to load game: ${error instanceof Error ? error.message : 'Unknown error'}`);
       throw error;
     }
-  }, [setLoading, setError]);
+  }, [validateNetwork, setLoading, setError]);
 
   // Join game and play (Player 2)
   const joinGame = useCallback(async (
@@ -398,6 +440,8 @@ export const useGame = () => {
     setError(null);
 
     try {
+      await validateNetwork();
+
       if (!move || move < 1 || move > 5) {
         throw new Error('Please select a valid move (1-5)');
       }
@@ -409,25 +453,52 @@ export const useGame = () => {
       // Get stake amount
       const stake = await contract.stake();
       
+      // ✅ Check balance
+      const balance = await provider.getBalance(account);
+      const feeData = await provider.getFeeData();
+      const gasPrice = feeData.gasPrice || 0n;
+      const estimatedGas = 200000n; // Estimate for play()
+      const totalCost = stake + (gasPrice * estimatedGas);
+      
+      if (balance < totalCost) {
+        throw new Error(
+          `Insufficient ETH. Need ${ethers.formatEther(totalCost)} ETH ` +
+          `(${ethers.formatEther(stake)} stake + ~${ethers.formatEther(gasPrice * estimatedGas)} gas), ` +
+          `but you have ${ethers.formatEther(balance)} ETH`
+        );
+      }
+      
       // Call play function
       const tx = await contract.play(move, {
         value: stake
       });
       
-      await tx.wait();
+      console.log('Play transaction:', tx.hash);
       
-      console.log('Play transaction:', tx);
+      // ✅ Wait and check receipt
+      const receipt = await tx.wait();
+      
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted! Failed to join game.');
+      }
+      
+      console.log('Play transaction confirmed:', receipt);
       
       setLoading(false);
-      setSuccess(`You played ${FRONTEND_MOVES[move]}! Waiting for Player 1 to reveal...`);
+      setSuccess(`You played ${FRONTEND_MOVES[move]}! Tx: ${tx.hash.slice(0, 10)}... Waiting for Player 1 to reveal...`);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error joining game:', error);
       setLoading(false);
-      setError(`Failed to join game: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const txHash = error.transaction?.hash || error.receipt?.hash;
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const fullError = txHash 
+        ? `${errorMsg}. Tx: https://sepolia.etherscan.io/tx/${txHash}`
+        : errorMsg;
+      setError(`Failed to join game: ${fullError}`);
       throw error;
     }
-  }, [setLoading, setError, setSuccess]);
+  }, [validateNetwork, setLoading, setError, setSuccess]);
 
   // Reveal move (Player 1)
   const revealMove = useCallback(async (
@@ -444,6 +515,8 @@ export const useGame = () => {
     setError(null);
 
     try {
+      await validateNetwork();
+
       if (!move || move < 1 || move > 5) {
         throw new Error('Please select a valid move (1-5)');
       }
@@ -456,33 +529,49 @@ export const useGame = () => {
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(contractAddress, RPS_ABI, signer);
       
-      // Verify the commitment
-      const commitment = createCommitment(move, salt);
-      const storedCommitment = await contract.c1Hash();
-      
-      if (commitment.toLowerCase() !== storedCommitment.toLowerCase()) {
-        throw new Error('Invalid move or salt! The commitment does not match.');
-      }
+      // ✅ Remove redundant check - let contract validate
+      // The contract will revert if commitment doesn't match
       
       // Call solve function
       const tx = await contract.solve(move, salt);
-      await tx.wait();
+      console.log('Solve transaction:', tx.hash);
       
-      console.log('Solve transaction:', tx);
+      // ✅ Wait and check receipt
+      const receipt = await tx.wait();
+      
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted! Invalid move or salt, or game already resolved.');
+      }
+      
+      console.log('Solve transaction confirmed:', receipt);
       
       // Clean up localStorage
       localStorage.removeItem(`game_${contractAddress}`);
       
       setLoading(false);
-      setSuccess('Move revealed! Game resolved. Check your wallet for winnings.');
+      setSuccess(`Move revealed! Game resolved. Tx: ${tx.hash.slice(0, 10)}... Check your wallet for winnings.`);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error revealing move:', error);
       setLoading(false);
-      setError(`Failed to reveal move: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // ✅ Parse the revert reason
+      const reason = error.reason || error.message || '';
+      const txHash = error.transaction?.hash || error.receipt?.hash;
+      
+      let errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      if (reason.includes('Invalid move or salt')) {
+        errorMsg = 'Invalid move or salt! The commitment does not match. Double-check your move and salt.';
+      }
+      
+      const fullError = txHash 
+        ? `${errorMsg} Tx: https://sepolia.etherscan.io/tx/${txHash}`
+        : errorMsg;
+      
+      setError(`Failed to reveal move: ${fullError}`);
       throw error;
     }
-  }, [createCommitment, setLoading, setError, setSuccess]);
+  }, [validateNetwork, setLoading, setError, setSuccess]);
 
   // Timeout for Player 1 (if Player 2 didn't play)
   const j1Timeout = useCallback(async (contractAddress: string, account: string) => {
@@ -494,25 +583,39 @@ export const useGame = () => {
     setError(null);
 
     try {
+      await validateNetwork();
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(contractAddress, RPS_ABI, signer);
       
       const tx = await contract.j2Timeout();
-      await tx.wait();
+      console.log('Timeout transaction:', tx.hash);
       
-      console.log('Timeout transaction:', tx);
+      // ✅ Wait and check receipt
+      const receipt = await tx.wait();
+      
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted! Timeout may not be available yet or already claimed.');
+      }
+      
+      console.log('Timeout transaction confirmed:', receipt);
       
       setLoading(false);
-      setSuccess('Timeout claimed! Your stake has been returned.');
+      setSuccess(`Timeout claimed! Your stake has been returned. Tx: ${tx.hash.slice(0, 10)}...`);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error claiming timeout:', error);
       setLoading(false);
-      setError(`Failed to claim timeout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const txHash = error.transaction?.hash || error.receipt?.hash;
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const fullError = txHash 
+        ? `${errorMsg} Tx: https://sepolia.etherscan.io/tx/${txHash}`
+        : errorMsg;
+      setError(`Failed to claim timeout: ${fullError}`);
       throw error;
     }
-  }, [setLoading, setError, setSuccess]);
+  }, [validateNetwork, setLoading, setError, setSuccess]);
 
   // Timeout for Player 2 (if Player 1 didn't reveal)
   const j2Timeout = useCallback(async (contractAddress: string, account: string) => {
@@ -524,25 +627,39 @@ export const useGame = () => {
     setError(null);
 
     try {
+      await validateNetwork();
+
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
       const contract = new ethers.Contract(contractAddress, RPS_ABI, signer);
       
       const tx = await contract.j1Timeout();
-      await tx.wait();
+      console.log('Timeout transaction:', tx.hash);
       
-      console.log('Timeout transaction:', tx);
+      // ✅ Wait and check receipt
+      const receipt = await tx.wait();
+      
+      if (receipt && receipt.status === 0) {
+        throw new Error('Transaction reverted! Timeout may not be available yet or already claimed.');
+      }
+      
+      console.log('Timeout transaction confirmed:', receipt);
       
       setLoading(false);
-      setSuccess('Timeout claimed! You won by timeout.');
+      setSuccess(`Timeout claimed! You won by timeout. Tx: ${tx.hash.slice(0, 10)}...`);
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error claiming timeout:', error);
       setLoading(false);
-      setError(`Failed to claim timeout: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      const txHash = error.transaction?.hash || error.receipt?.hash;
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      const fullError = txHash 
+        ? `${errorMsg} Tx: https://sepolia.etherscan.io/tx/${txHash}`
+        : errorMsg;
+      setError(`Failed to claim timeout: ${fullError}`);
       throw error;
     }
-  }, [setLoading, setError, setSuccess]);
+  }, [validateNetwork, setLoading, setError, setSuccess]);
 
   // Check game state
   const checkGameState = useCallback(async (contractAddress: string) => {
@@ -575,7 +692,7 @@ export const useGame = () => {
       
       // Determine game status
       let status = 'Unknown';
-      if (c2 == 0) {
+      if (Number(c2) === 0) {  // ✅ Fixed BigInt comparison
         status = 'Waiting for Player 2 to play';
       } else {
         status = 'Waiting for Player 1 to reveal';
