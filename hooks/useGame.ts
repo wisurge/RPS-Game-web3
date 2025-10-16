@@ -303,7 +303,7 @@ export const useGame = () => {
       // Convert stake to Wei
       const stakeWei = ethers.parseEther(stakeAmount);
       
-      if (stakeWei <= 0n) {
+      if (stakeWei <= BigInt(0)) {
         throw new Error('Stake amount must be greater than 0');
       }
 
@@ -314,8 +314,8 @@ export const useGame = () => {
       // ✅ Check balance before transaction
       const balance = await provider.getBalance(account);
       const feeData = await provider.getFeeData();
-      const gasPrice = feeData.gasPrice || 0n;
-      const estimatedGas = 500000n; // Rough estimate for contract deployment
+      const gasPrice = feeData.gasPrice || BigInt(0);
+      const estimatedGas = BigInt(500000); // Rough estimate for contract deployment
       const totalCost = stakeWei + (gasPrice * estimatedGas);
       
       if (balance < totalCost) {
@@ -455,8 +455,8 @@ export const useGame = () => {
       // ✅ Check balance
       const balance = await provider.getBalance(account);
       const feeData = await provider.getFeeData();
-      const gasPrice = feeData.gasPrice || 0n;
-      const estimatedGas = 200000n; // Estimate for play()
+      const gasPrice = feeData.gasPrice || BigInt(0);
+      const estimatedGas = BigInt(200000); // Estimate for play()
       const totalCost = stake + (gasPrice * estimatedGas);
       
       if (balance < totalCost) {
