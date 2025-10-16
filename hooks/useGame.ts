@@ -10,7 +10,8 @@ declare global {
   }
 }
 
-// RPS Contract ABI - Compiled from RPS.sol
+// RPS Contract ABI - compiled from RPS.sol
+// Move enum: Null=0, Rock=1, Paper=2, Scissors=3, Spock=4, Lizard=5
 const RPS_ABI = [
   {
     "inputs": [
@@ -237,31 +238,29 @@ export const useGame = () => {
     setGameState(prev => ({ ...prev, success }));
   }, []);
 
-  // Generate cryptographically secure random salt
+  // Generate a random salt for the commitment scheme
+  // Using crypto.getRandomValues instead of Math.random for security
   const generateSalt = useCallback(() => {
-    // Generate a 256-bit random number (32 bytes)
     const array = new Uint8Array(32);
     window.crypto.getRandomValues(array);
     
-    // Keep as hex string for better precision and readability
     let hexString = '0x';
     for (let i = 0; i < array.length; i++) {
       hexString += array[i].toString(16).padStart(2, '0');
     }
     
-    return hexString;  // ✅ Keep as hex string
+    return hexString;
   }, []);
 
-  // Create commitment hash - matches contract's hash function
+  // Create the commitment hash that matches the contract
+  // This needs to match keccak256(abi.encodePacked(move, salt)) exactly
   const createCommitment = useCallback((move: number, salt: string) => {
-    // Hash = keccak256(abi.encodePacked(move, salt)) - same as contract
-    // Convert salt to BigInt (works with both hex 0x... and decimal strings)
     const saltBigInt = BigInt(salt);
     const encoded = ethers.solidityPacked(['uint8', 'uint256'], [move, saltBigInt]);
     return ethers.keccak256(encoded);
   }, []);
 
-  // Validate network before transactions
+  // Make sure we're on the right network before any transaction
   const validateNetwork = useCallback(async () => {
     const provider = new ethers.BrowserProvider(window.ethereum);
     const network = await provider.getNetwork();
@@ -378,7 +377,7 @@ export const useGame = () => {
     }
   }, [generateSalt, createCommitment, validateNetwork, setLoading, setError, setSuccess]);
 
-  // Load game information
+  // Load game info for Player 2 to join
   const loadGameInfo = useCallback(async (contractAddress: string, account: string) => {
     if (!ethers.isAddress(contractAddress)) {
       throw new Error('Invalid contract address');

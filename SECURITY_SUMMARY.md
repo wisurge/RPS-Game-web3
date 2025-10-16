@@ -479,6 +479,35 @@ For mainnet deployment with significant funds, recommend additional measures (en
 
 ---
 
+## 📋 Smart Contract Security Notes
+
+### **Known Issues in RPS.sol (Cannot Modify Per Requirements):**
+
+**⚠️ Reentrancy Vulnerability:**
+
+- The `solve()` function transfers ETH before setting game state
+- Violates Checks-Effects-Interactions pattern
+- **Risk:** Medium for testnet, HIGH for mainnet
+- **Mitigation:** Use only on testnet with small amounts
+
+**⚠️ Timeout Functions:**
+
+- Can potentially be called multiple times in edge cases
+- **Risk:** Low (stake prevents most issues)
+- **Mitigation:** Don't leave games in timeout state
+
+### **Frontend Protection (All Implemented):**
+
+- ✅ All user inputs validated before transactions
+- ✅ Balance checked before submission
+- ✅ Network validated (Sepolia only)
+- ✅ Transaction receipts checked for success
+- ✅ Clear error messages with Etherscan links
+
+**Bottom Line:** The provided smart contract is suitable for this testnet exercise. The frontend provides maximum user protection within the constraints of the existing contract.
+
+---
+
 **Prepared by:** AI Security Analysis  
 **Date:** October 15, 2025  
 **Version:** 1.0

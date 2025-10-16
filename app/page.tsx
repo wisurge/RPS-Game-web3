@@ -138,16 +138,16 @@ export default function HomePage() {
     e.preventDefault();
     if (!account) return;
 
-    // ✅ CRITICAL: Double-check with user before reveal
+    // Double-check with user before reveal
     const moveName =
       MOVE_OPTIONS.find((m) => m.value === revealForm.move)?.label || "Unknown";
     const confirmed = window.confirm(
-      `🚨 CRITICAL CHECK:\n\n` +
+      `Final check before revealing:\n\n` +
         `Move: ${moveName}\n` +
         `Salt: ${revealForm.salt.slice(0, 20)}...\n\n` +
-        `Are these values EXACTLY what you used when creating the game?\n\n` +
-        `⚠️ IF WRONG, YOU WILL LOSE YOUR STAKE!\n\n` +
-        `Click OK only if you are 100% sure.`
+        `Are these the same values you used when creating the game?\n\n` +
+        `If they're wrong, you'll lose your stake!\n\n` +
+        `Continue?`
     );
 
     if (!confirmed) {
@@ -212,7 +212,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16">
           <div className="text-center">
             <div className="inline-flex items-center px-4 py-2 rounded-full bg-blue-100 text-blue-800 text-sm font-medium mb-6">
-              🎮 Blockchain Gaming
+              Blockchain Gaming
             </div>
             <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
               Rock Paper Scissors
@@ -376,7 +376,6 @@ export default function HomePage() {
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-6 mb-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">❌</span>
                   <p className="text-red-800 font-medium">{error}</p>
                 </div>
               </div>
@@ -384,7 +383,6 @@ export default function HomePage() {
             {success && (
               <div className="bg-green-50 border border-green-200 rounded-xl p-6 mb-4">
                 <div className="flex items-center gap-3">
-                  <span className="text-2xl">✅</span>
                   <p className="text-green-800 font-medium">{success}</p>
                 </div>
               </div>
@@ -502,26 +500,26 @@ export default function HomePage() {
 
               {gameCreated && (
                 <div className="mt-6 space-y-4">
-                  {/* CRITICAL WARNING BANNER */}
+                  {/* Warning banner */}
                   <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4">
                     <div className="flex items-center gap-3 mb-3">
                       <span className="text-3xl">🚨</span>
                       <h3 className="text-xl font-bold text-red-900">
-                        CRITICAL: SAVE YOUR SALT NOW!
+                        Important: Save Your Salt!
                       </h3>
                     </div>
                     <div className="space-y-2 text-red-800 text-sm">
                       <p className="font-bold text-base">
-                        If you lose this salt, you will LOSE YOUR STAKED ETH!
+                        If you lose this salt, you'll lose your staked ETH!
                       </p>
                       <ul className="list-disc list-inside space-y-1 ml-2">
-                        <li>Copy the salt below to a password manager</li>
+                        <li>Copy the salt to a password manager</li>
                         <li>Write it down on paper as backup</li>
-                        <li>Do NOT rely only on this browser</li>
-                        <li>Clearing browser data will DELETE the salt</li>
+                        <li>Don't rely only on this browser</li>
+                        <li>Clearing browser data will delete the salt</li>
                       </ul>
                       <p className="font-bold mt-2 text-red-900">
-                        ⚠️ There is NO WAY to recover a lost salt!
+                        ⚠️ There's no way to recover a lost salt!
                       </p>
                     </div>
                   </div>

@@ -62,3 +62,11 @@ npm run dev
 **Optimal Strategy**: Each player should play each move with equal probability (20% each: Rock 20%, Paper 20%, Scissors 20%, Spock 20%, Lizard 20%).
 
 This ensures no move provides an advantage, resulting in an expected payoff of 0 for both players.
+
+**Full Explanation**: See `NASH_EQUILIBRIUM_EXPLANATION.md` for mathematical proof.
+
+---
+
+## 🚀 Deployment
+
+**See `DEPLOYMENT_GUIDE.md` for complete deployment instructions.**
