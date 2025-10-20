@@ -66,7 +66,3 @@ This ensures no move provides an advantage, resulting in an expected payoff of 0
 **Full Explanation**: See `NASH_EQUILIBRIUM_EXPLANATION.md` for mathematical proof.
 
 ---
-
-## 🚀 Deployment
-
-**See `DEPLOYMENT_GUIDE.md` for complete deployment instructions.**
